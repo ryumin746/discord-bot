@@ -1,53 +1,134 @@
-
+```python
 import os
 import asyncio
 import discord
+
 from discord.ext import commands
 from discord import app_commands
+
 from dotenv import load_dotenv
 
-# =========================
+from flask import Flask
+from threading import Thread
+
+
+# =========================================================
 # 환경 변수
-# =========================
+# =========================================================
 
 load_dotenv()
 
 TOKEN = os.getenv("DISCORD_TOKEN")
-GUILD_ID = int(os.getenv("GUILD_ID", "0"))
-VERIFY_CHANNEL_ID = int(os.getenv("VERIFY_CHANNEL_ID", "0"))
-STAFF_ROLE_ID = int(os.getenv("STAFF_ROLE_ID", "0"))
-VERIFIED_ROLE_ID = int(os.getenv("VERIFIED_ROLE_ID", "0"))
-UNVERIFIED_ROLE_ID = int(os.getenv("UNVERIFIED_ROLE_ID", "0"))
-TICKET_CATEGORY_ID = int(os.getenv("TICKET_CATEGORY_ID", "0"))
 
-# =========================
-# 기본 설정
-# =========================
+GUILD_ID = int(
+    os.getenv("GUILD_ID", "0")
+)
+
+VERIFY_CHANNEL_ID = int(
+    os.getenv("VERIFY_CHANNEL_ID", "0")
+)
+
+STAFF_ROLE_ID = int(
+    os.getenv("STAFF_ROLE_ID", "0")
+)
+
+VERIFIED_ROLE_ID = int(
+    os.getenv("VERIFIED_ROLE_ID", "0")
+)
+
+UNVERIFIED_ROLE_ID = int(
+    os.getenv("UNVERIFIED_ROLE_ID", "0")
+)
+
+TICKET_CATEGORY_ID = int(
+    os.getenv("TICKET_CATEGORY_ID", "0")
+)
+
+
+# =========================================================
+# Render Web Service용 웹 서버
+# =========================================================
+
+app = Flask(__name__)
+
+
+@app.route("/")
+def home():
+
+    return "Discord Bot is running!"
+
+
+@app.route("/health")
+def health():
+
+    return "OK"
+
+
+def run_web():
+
+    port = int(
+        os.environ.get(
+            "PORT",
+            10000
+        )
+    )
+
+    app.run(
+        host="0.0.0.0",
+        port=port
+    )
+
+
+def keep_web_alive():
+
+    thread = Thread(
+        target=run_web,
+        daemon=True
+    )
+
+    thread.start()
+
+
+# =========================================================
+# Discord 기본 설정
+# =========================================================
 
 intents = discord.Intents.default()
+
 intents.guilds = True
 intents.members = True
+
 
 bot = commands.Bot(
     command_prefix="!",
     intents=intents
 )
 
-# =========================
+
+# =========================================================
 # 봇 시작
-# =========================
+# =========================================================
 
 @bot.event
 async def on_ready():
 
     print("=" * 50)
-    print(f"로그인 완료: {bot.user}")
-    print(f"봇 ID: {bot.user.id}")
+
+    print(
+        f"로그인 완료: {bot.user}"
+    )
+
+    print(
+        f"봇 ID: {bot.user.id}"
+    )
+
     print("=" * 50)
 
     try:
 
-        guild = discord.Object(id=GUILD_ID)
+        guild = discord.Object(
+            id=GUILD_ID
+        )
 
         synced = await bot.tree.sync(
             guild=guild
@@ -60,15 +141,20 @@ async def on_ready():
 
     except Exception as e:
 
-        print("슬래시 명령어 동기화 실패:")
+        print(
+            "슬래시 명령어 동기화 실패:"
+        )
+
         print(e)
 
 
-# =========================
+# =========================================================
 # 처리단 확인
-# =========================
+# =========================================================
 
-def is_staff(member: discord.Member):
+def is_staff(
+    member: discord.Member
+):
 
     return any(
         role.id == STAFF_ROLE_ID
@@ -76,9 +162,9 @@ def is_staff(member: discord.Member):
     )
 
 
-# =========================
+# =========================================================
 # 티켓 번호
-# =========================
+# =========================================================
 
 async def get_ticket_number(
     guild: discord.Guild
@@ -92,6 +178,7 @@ async def get_ticket_number(
         category,
         discord.CategoryChannel
     ):
+
         return 1
 
     numbers = []
@@ -101,6 +188,7 @@ async def get_ticket_number(
         if not channel.name.startswith(
             "ticket-"
         ):
+
             continue
 
         try:
@@ -116,14 +204,15 @@ async def get_ticket_number(
             pass
 
     if not numbers:
+
         return 1
 
     return max(numbers) + 1
 
 
-# =========================
+# =========================================================
 # 인증 완료 버튼
-# =========================
+# =========================================================
 
 class VerifyCompleteButton(
     discord.ui.Button
@@ -147,11 +236,12 @@ class VerifyCompleteButton(
             interaction.user,
             discord.Member
         ):
+
             return
 
-        # =========================
+        # ---------------------------------------------
         # 처리단 확인
-        # =========================
+        # ---------------------------------------------
 
         if not is_staff(
             interaction.user
@@ -178,9 +268,9 @@ class VerifyCompleteButton(
 
             return
 
-        # =========================
-        # 티켓 생성자 찾기
-        # =========================
+        # ---------------------------------------------
+        # 티켓 소유자
+        # ---------------------------------------------
 
         owner_id = channel.topic
 
@@ -195,7 +285,9 @@ class VerifyCompleteButton(
 
         try:
 
-            owner_id = int(owner_id)
+            owner_id = int(
+                owner_id
+            )
 
         except ValueError:
 
@@ -206,9 +298,9 @@ class VerifyCompleteButton(
 
             return
 
-        # =========================
+        # ---------------------------------------------
         # 멤버 찾기
-        # =========================
+        # ---------------------------------------------
 
         member = interaction.guild.get_member(
             owner_id
@@ -240,9 +332,9 @@ class VerifyCompleteButton(
 
                 return
 
-        # =========================
-        # 역할 가져오기
-        # =========================
+        # ---------------------------------------------
+        # 역할
+        # ---------------------------------------------
 
         verified_role = interaction.guild.get_role(
             VERIFIED_ROLE_ID
@@ -261,9 +353,9 @@ class VerifyCompleteButton(
 
             return
 
-        # =========================
-        # 인증완료 역할 지급
-        # =========================
+        # ---------------------------------------------
+        # 인증완료 역할 추가
+        # ---------------------------------------------
 
         try:
 
@@ -299,9 +391,9 @@ class VerifyCompleteButton(
 
             return
 
-        # =========================
+        # ---------------------------------------------
         # 미인증 역할 제거
-        # =========================
+        # ---------------------------------------------
 
         if unverified_role:
 
@@ -328,9 +420,9 @@ class VerifyCompleteButton(
                     e
                 )
 
-        # =========================
-        # 처리단에게만 표시
-        # =========================
+        # ---------------------------------------------
+        # 처리단에게 표시
+        # ---------------------------------------------
 
         await interaction.response.send_message(
             f"✅ **{member.display_name}**님의 "
@@ -338,9 +430,9 @@ class VerifyCompleteButton(
             ephemeral=True
         )
 
-        # =========================
-        # 티켓 완료 메시지
-        # =========================
+        # ---------------------------------------------
+        # 티켓 메시지
+        # ---------------------------------------------
 
         try:
 
@@ -353,9 +445,9 @@ class VerifyCompleteButton(
 
             pass
 
-        # =========================
-        # 잠시 후 티켓 삭제
-        # =========================
+        # ---------------------------------------------
+        # 티켓 삭제
+        # ---------------------------------------------
 
         await asyncio.sleep(3)
 
@@ -379,9 +471,9 @@ class VerifyCompleteButton(
             )
 
 
-# =========================
+# =========================================================
 # 반려 버튼
-# =========================
+# =========================================================
 
 class RejectButton(
     discord.ui.Button
@@ -405,11 +497,12 @@ class RejectButton(
             interaction.user,
             discord.Member
         ):
+
             return
 
-        # =========================
+        # ---------------------------------------------
         # 처리단 확인
-        # =========================
+        # ---------------------------------------------
 
         if not is_staff(
             interaction.user
@@ -436,9 +529,9 @@ class RejectButton(
 
             return
 
-        # =========================
-        # 반려 메시지
-        # =========================
+        # ---------------------------------------------
+        # 반려
+        # ---------------------------------------------
 
         await interaction.response.send_message(
             "❌ 인증 신청이 반려되었습니다. "
@@ -468,9 +561,9 @@ class RejectButton(
             )
 
 
-# =========================
+# =========================================================
 # 처리 패널
-# =========================
+# =========================================================
 
 class StaffVerifyView(
     discord.ui.View
@@ -491,9 +584,9 @@ class StaffVerifyView(
         )
 
 
-# =========================
+# =========================================================
 # 인증 신청 버튼
-# =========================
+# =========================================================
 
 class CreateTicketButton(
     discord.ui.Button
@@ -513,13 +606,12 @@ class CreateTicketButton(
         interaction: discord.Interaction
     ):
 
-        # ==================================================
-        # 중요
+        # =================================================
+        # 가장 먼저 응답
         #
-        # Discord 버튼은 약 3초 안에 응답해야 한다.
-        # 티켓 생성 전에 defer()를 보내서
-        # "적시에 응답하지 않았어요" 오류를 방지한다.
-        # ==================================================
+        # Discord Interaction은 제한 시간이 있으므로
+        # 티켓 생성 전에 defer를 한다.
+        # =================================================
 
         await interaction.response.defer(
             ephemeral=True
@@ -538,9 +630,9 @@ class CreateTicketButton(
 
         member = interaction.user
 
-        # =========================
-        # 이미 인증되어 있는지 확인
-        # =========================
+        # ---------------------------------------------
+        # 이미 인증됐는지 확인
+        # ---------------------------------------------
 
         verified_role = guild.get_role(
             VERIFIED_ROLE_ID
@@ -558,9 +650,9 @@ class CreateTicketButton(
 
             return
 
-        # =========================
-        # 티켓 카테고리 확인
-        # =========================
+        # ---------------------------------------------
+        # 카테고리
+        # ---------------------------------------------
 
         category = guild.get_channel(
             TICKET_CATEGORY_ID
@@ -578,9 +670,9 @@ class CreateTicketButton(
 
             return
 
-        # =========================
+        # ---------------------------------------------
         # 기존 티켓 확인
-        # =========================
+        # ---------------------------------------------
 
         for channel in category.channels:
 
@@ -588,6 +680,7 @@ class CreateTicketButton(
                 channel,
                 discord.TextChannel
             ):
+
                 continue
 
             if channel.topic == str(
@@ -602,9 +695,9 @@ class CreateTicketButton(
 
                 return
 
-        # =========================
+        # ---------------------------------------------
         # 티켓 번호
-        # =========================
+        # ---------------------------------------------
 
         ticket_number = await get_ticket_number(
             guild
@@ -614,9 +707,9 @@ class CreateTicketButton(
             f"ticket-{ticket_number:02d}"
         )
 
-        # =========================
+        # ---------------------------------------------
         # 처리단 역할
-        # =========================
+        # ---------------------------------------------
 
         staff_role = guild.get_role(
             STAFF_ROLE_ID
@@ -631,9 +724,9 @@ class CreateTicketButton(
 
             return
 
-        # =========================
+        # ---------------------------------------------
         # 봇 멤버
-        # =========================
+        # ---------------------------------------------
 
         bot_member = guild.me
 
@@ -646,9 +739,9 @@ class CreateTicketButton(
 
             return
 
-        # =========================
-        # 권한 설정
-        # =========================
+        # ---------------------------------------------
+        # 권한
+        # ---------------------------------------------
 
         overwrites = {
 
@@ -681,9 +774,9 @@ class CreateTicketButton(
                 )
         }
 
-        # =========================
+        # ---------------------------------------------
         # 티켓 생성
-        # =========================
+        # ---------------------------------------------
 
         try:
 
@@ -735,9 +828,9 @@ class CreateTicketButton(
 
             return
 
-        # =========================
-        # 사용자에게 티켓 생성 알림
-        # =========================
+        # ---------------------------------------------
+        # 사용자에게 알림
+        # ---------------------------------------------
 
         await interaction.followup.send(
             f"🎫 인증 티켓이 생성되었습니다.\n"
@@ -745,13 +838,14 @@ class CreateTicketButton(
             ephemeral=True
         )
 
-        # =========================
+        # ---------------------------------------------
         # 티켓 메시지
-        # =========================
+        # ---------------------------------------------
 
         try:
 
             await ticket.send(
+
                 content=(
                     f"{member.mention} "
                     f"{staff_role.mention}"
@@ -778,9 +872,9 @@ class CreateTicketButton(
             )
 
 
-# =========================
+# =========================================================
 # 인증 패널
-# =========================
+# =========================================================
 
 class VerifyPanelView(
     discord.ui.View
@@ -797,16 +891,18 @@ class VerifyPanelView(
         )
 
 
-# =========================
+# =========================================================
 # /인증패널
-# =========================
+# =========================================================
 
 @bot.tree.command(
     name="인증패널",
     description="인증 신청 패널을 생성합니다."
 )
 @app_commands.guilds(
-    discord.Object(id=GUILD_ID)
+    discord.Object(
+        id=GUILD_ID
+    )
 )
 async def verification_panel(
     interaction: discord.Interaction
@@ -816,11 +912,12 @@ async def verification_panel(
         interaction.user,
         discord.Member
     ):
+
         return
 
-    # =========================
+    # ---------------------------------------------
     # 관리자 / 처리단 확인
-    # =========================
+    # ---------------------------------------------
 
     if (
         not is_staff(interaction.user)
@@ -834,9 +931,9 @@ async def verification_panel(
 
         return
 
-    # =========================
+    # ---------------------------------------------
     # 인증 채널
-    # =========================
+    # ---------------------------------------------
 
     channel = interaction.guild.get_channel(
         VERIFY_CHANNEL_ID
@@ -854,9 +951,9 @@ async def verification_panel(
 
         return
 
-    # =========================
-    # 인증 패널 Embed
-    # =========================
+    # ---------------------------------------------
+    # Embed
+    # ---------------------------------------------
 
     embed = discord.Embed(
         title="🔐 서버 인증",
@@ -872,9 +969,9 @@ async def verification_panel(
         text="인증 시스템"
     )
 
-    # =========================
+    # ---------------------------------------------
     # 패널 전송
-    # =========================
+    # ---------------------------------------------
 
     try:
 
@@ -906,9 +1003,9 @@ async def verification_panel(
 
         return
 
-    # =========================
-    # 명령어 실행자에게 알림
-    # =========================
+    # ---------------------------------------------
+    # 완료
+    # ---------------------------------------------
 
     await interaction.response.send_message(
         f"✅ 인증 패널을 "
@@ -917,14 +1014,15 @@ async def verification_panel(
     )
 
 
-# =========================
+# =========================================================
 # View 재등록
-# =========================
+# =========================================================
 
 @bot.event
 async def setup_hook():
 
-    # 봇 재시작 후에도 기존 버튼 작동
+    # 봇 재시작 후에도 기존 버튼 유지
+
     bot.add_view(
         VerifyPanelView()
     )
@@ -934,17 +1032,27 @@ async def setup_hook():
     )
 
 
-# =========================
+# =========================================================
 # 실행
-# =========================
+# =========================================================
 
 if not TOKEN:
 
     print(
-        "❌ DISCORD_TOKEN이 "
-        ".env에 없습니다."
+        "❌ DISCORD_TOKEN이 없습니다."
     )
 
 else:
 
+    print(
+        "🌐 Render 웹 서버 시작..."
+    )
+
+    keep_web_alive()
+
+    print(
+        "🤖 Discord 봇 시작..."
+    )
+
     bot.run(TOKEN)
+```
