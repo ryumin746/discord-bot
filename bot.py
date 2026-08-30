@@ -1,4 +1,4 @@
-```python
+
 import os
 import asyncio
 import discord
@@ -1055,4 +1055,3 @@ else:
     )
 
     bot.run(TOKEN)
-```
